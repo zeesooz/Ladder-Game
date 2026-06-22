@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>이름 사다리 게임</title>
+  <style>
+    :root {
+      --bg: #f7f7fb;
+      --card: #ffffff;
+      --text: #222;
+      --muted: #666;
+      --line: #222;
+      --accent: #4f46e5;
+      --accent2: #16a34a;
+      --danger: #dc2626;
+      --shadow: 0 12px 32px rgba(20, 20, 40, 0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at top left, #eef2ff, transparent 34%), var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+    .wrap {
+      width: min(1240px, 100%);
+      background: var(--card);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    header {
+      padding: 30px 30px 18px;
+      text-align: center;
+      background: linear-gradient(135deg, #eef2ff, #fff);
+    }
+    h1 { margin: 0 0 8px; font-size: clamp(28px, 4vw, 44px); letter-spacing: -0.04em; }
+    .sub { margin: 0; color: var(--muted); font-size: 15px; }
+    main { padding: 24px; }
+    .panel {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    input {
+      width: 100%;
+      border: 2px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 16px 18px;
+      font-size: 18px;
+      outline: none;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(79, 70, 229, .12); }
+    button {
+      border: 0;
+      border-radius: 16px;
+      padding: 0 22px;
+      font-size: 17px;
+      font-weight: 800;
+      color: white;
+      background: var(--accent);
+      cursor: pointer;
+      min-width: 116px;
+    }
+    button:hover { filter: brightness(.96); }
+    .helper { color: var(--muted); font-size: 13px; margin: 0 0 16px 4px; }
+    .ladderBox {
+      border: 1px solid #ececf2;
+      border-radius: 22px;
+      background: #fbfbff;
+      padding: 18px;
+      overflow-x: auto;
+    }
+    svg { width: 100%; min-width: 1380px; height: 520px; display: block; }
+    .vline, .hline { stroke: var(--line); stroke-width: 4; stroke-linecap: round; opacity: .72; }
+    .path { fill: none; stroke: var(--accent2); stroke-width: 8; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 2600; stroke-dashoffset: 2600; opacity: 0; }
+    .path.run { animation: draw 1.65s ease forwards; opacity: 1; }
+    @keyframes draw { to { stroke-dashoffset: 0; } }
+    .nameLabel { font-size: 13px; fill: #333; font-weight: 850; writing-mode: vertical-rl; glyph-orientation-vertical: 0deg; }
+    .bottom { font-size: 14px; fill: #555; font-weight: 950; }
+    .selectedTop, .selectedBottom { fill: #4f46e5; font-weight: 950; }
+    .result {
+      margin-top: 18px;
+      display: none;
+      border-radius: 22px;
+      padding: 22px;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      text-align: center;
+    }
+    .result.show { display: block; }
+    .result .name { font-size: 18px; color: var(--muted); margin-bottom: 6px; }
+    .result .team { font-size: clamp(28px, 4vw, 46px); font-weight: 950; letter-spacing: -0.04em; color: #166534; }
+    .error {
+      display: none;
+      margin-top: 14px;
+      color: var(--danger);
+      font-weight: 800;
+      text-align: center;
+    }
+    .error.show { display: block; }
+    details { margin-top: 18px; color: var(--muted); font-size: 13px; }
+    summary { cursor: pointer; }
+    .names { line-height: 1.9; margin-top: 8px; }
+    .note { margin-top: 8px; font-size: 12px; color: var(--muted); text-align: right; }
+    @media (max-width: 640px) {
+      body { padding: 12px; }
+      .panel { grid-template-columns: 1fr; }
+      button { height: 54px; }
+      main { padding: 18px; }
+      svg { min-width: 1320px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>사다리 게임</h1>
+      <p class="sub">이름을 입력하면 사다리를 따라 내려가 조 번호가 나옵니다.</p>
+    </header>
+    <main>
+      <div class="panel">
+        <input id="nameInput" type="text" placeholder="예: 강민희" autocomplete="off" />
+        <button id="playBtn">결과 확인</button>
+      </div>
+      <p class="helper">상단은 참가자 이름, 하단은 섞인 조 번호입니다. 초록색 선이 선택한 이름의 실제 이동 경로입니다.</p>
+
+      <div class="ladderBox">
+        <svg id="ladderSvg" viewBox="0 0 1380 520" aria-label="이름별 사다리 게임 그림">
+          <g id="ladderLines"></g>
+          <g id="topLabels"></g>
+          <g id="bottomLabels"></g>
+          <path id="path" class="path" d="" />
+        </svg>
+        <div class="note">가로로 길면 좌우로 스크롤해서 전체 이름을 볼 수 있습니다.</div>
+      </div>
+
+      <div id="result" class="result">
+        <div class="name" id="resultName"></div>
+        <div class="team" id="resultTeam"></div>
+      </div>
+      <div id="error" class="error"></div>
+
+      <details>
+        <summary>참가자 명단 보기</summary>
+        <div class="names">
+          1조 짜불성설: 강민희, 이해나, 김규민, 이재현<br />
+          2조 501동 사람들: 최상혁, 서민준, 박진영, 성준웅<br />
+          3조 이름없는집: 이병주, 권민주, 이강섭, 서정인<br />
+          4조 인지상점: 조유정, 신서영, 이시혁, 권시훤<br />
+          5조 침묵의 목격자: 양승희, 이지수, 김동호, 안소연
+        </div>
+      </details>
+    </main>
+  </div>
+
+  <script>
+    const participants = [
+      { name: "강민희", teamNo: "1조", teamFull: "1조 짜불성설" },
+      { name: "이해나", teamNo: "1조", teamFull: "1조 짜불성설" },
+      { name: "김규민", teamNo: "1조", teamFull: "1조 짜불성설" },
+      { name: "이재현", teamNo: "1조", teamFull: "1조 짜불성설" },
+      { name: "최상혁", teamNo: "2조", teamFull: "2조 501동 사람들" },
+      { name: "서민준", teamNo: "2조", teamFull: "2조 501동 사람들" },
+      { name: "박진영", teamNo: "2조", teamFull: "2조 501동 사람들" },
+      { name: "성준웅", teamNo: "2조", teamFull: "2조 501동 사람들" },
+      { name: "이병주", teamNo: "3조", teamFull: "3조 이름없는집" },
+      { name: "권민주", teamNo: "3조", teamFull: "3조 이름없는집" },
+      { name: "이강섭", teamNo: "3조", teamFull: "3조 이름없는집" },
+      { name: "서정인", teamNo: "3조", teamFull: "3조 이름없는집" },
+      { name: "조유정", teamNo: "4조", teamFull: "4조 인지상점" },
+      { name: "신서영", teamNo: "4조", teamFull: "4조 인지상점" },
+      { name: "이시혁", teamNo: "4조", teamFull: "4조 인지상점" },
+      { name: "권시훤", teamNo: "4조", teamFull: "4조 인지상점" },
+      { name: "양승희", teamNo: "5조", teamFull: "5조 침묵의 목격자" },
+      { name: "이지수", teamNo: "5조", teamFull: "5조 침묵의 목격자" },
+      { name: "김동호", teamNo: "5조", teamFull: "5조 침묵의 목격자" },
+      { name: "안소연", teamNo: "5조", teamFull: "5조 침묵의 목격자" }
+    ];
+
+    const assignments = Object.fromEntries(participants.map((p, index) => [p.name, { ...p, index } ]));
+    const startX = 55;
+    const gap = 66;
+    const topY = 122;
+    const bottomY = 430;
+    const labelTopY = 28;
+    const labelBottomY = 474;
+    const ladderLines = document.getElementById("ladderLines");
+    const topLabels = document.getElementById("topLabels");
+    const bottomLabels = document.getElementById("bottomLabels");
+    const path = document.getElementById("path");
+    const input = document.getElementById("nameInput");
+    const btn = document.getElementById("playBtn");
+    const result = document.getElementById("result");
+    const resultName = document.getElementById("resultName");
+    const resultTeam = document.getElementById("resultTeam");
+    const error = document.getElementById("error");
+
+    // 여러 높이에서 좌우 이동이 일어나도록 만든 고정 사다리선입니다.
+    // 같은 높이에서 붙어 있는 칸은 연결하지 않아, 일반 사다리 규칙처럼 자연스럽게 보입니다.
+    const fixedRungs = [
+      [0,1,145], [3,4,145], [6,7,145], [10,11,145], [14,15,145], [17,18,145],
+      [1,2,170], [4,5,170], [8,9,170], [12,13,170], [15,16,170], [18,19,170],
+      [2,3,195], [5,6,195], [7,8,195], [11,12,195], [13,14,195], [16,17,195],
+      [0,1,220], [4,5,220], [9,10,220], [12,13,220], [15,16,220],
+      [1,2,245], [3,4,245], [6,7,245], [10,11,245], [14,15,245], [17,18,245],
+      [2,3,270], [5,6,270], [8,9,270], [11,12,270], [13,14,270], [18,19,270],
+      [0,1,295], [4,5,295], [7,8,295], [10,11,295], [15,16,295],
+      [1,2,320], [3,4,320], [6,7,320], [9,10,320], [12,13,320], [16,17,320],
+      [2,3,345], [5,6,345], [8,9,345], [11,12,345], [14,15,345], [17,18,345],
+      [0,1,370], [4,5,370], [7,8,370], [10,11,370], [13,14,370], [18,19,370],
+      [1,2,395], [5,6,395], [9,10,395], [12,13,395], [15,16,395]
+    ];
+
+    const sortedRungs = [...fixedRungs].sort((a, b) => a[2] - b[2]);
+    const bottomTeams = buildBottomTeams();
+
+    function xAt(index) {
+      return startX + index * gap;
+    }
+
+    function makeSvgElement(tag, attrs) {
+      const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+      Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, value));
+      return el;
+    }
+
+    function destinationIndex(startIndex) {
+      let current = startIndex;
+      sortedRungs.forEach(([left, right]) => {
+        if (current === left) current = right;
+        else if (current === right) current = left;
+      });
+      return current;
+    }
+
+    function buildBottomTeams() {
+      const teams = new Array(participants.length);
+      participants.forEach((person, startIndex) => {
+        teams[destinationIndex(startIndex)] = person.teamNo;
+      });
+      return teams;
+    }
+
+    function drawLadder() {
+      participants.forEach((p, index) => {
+        const x = xAt(index);
+        ladderLines.appendChild(makeSvgElement("line", {
+          class: "vline", x1: x, y1: topY, x2: x, y2: bottomY
+        }));
+
+        const topText = makeSvgElement("text", {
+          class: "nameLabel", x, y: labelTopY, "text-anchor": "middle", id: `top-${p.name}`
+        });
+        topText.textContent = p.name;
+        topLabels.appendChild(topText);
+
+        const bottomText = makeSvgElement("text", {
+          class: "bottom", x, y: labelBottomY, "text-anchor": "middle", id: `bottom-${index}`
+        });
+        bottomText.textContent = bottomTeams[index];
+        bottomLabels.appendChild(bottomText);
+      });
+
+      fixedRungs.forEach(([left, right, y]) => {
+        ladderLines.appendChild(makeSvgElement("line", {
+          class: "hline", x1: xAt(left), y1: y, x2: xAt(right), y2: y
+        }));
+      });
+    }
+
+    function normalizeName(value) {
+      return value.replace(/\s/g, "").trim();
+    }
+
+    function clearHighlights() {
+      document.querySelectorAll(".selectedTop").forEach(el => el.classList.remove("selectedTop"));
+      document.querySelectorAll(".selectedBottom").forEach(el => el.classList.remove("selectedBottom"));
+    }
+
+    function buildPath(startIndex) {
+      let current = startIndex;
+      let d = `M${xAt(current)} ${topY}`;
+      sortedRungs.forEach(([left, right, y]) => {
+        if (current === left || current === right) {
+          const next = current === left ? right : left;
+          d += ` L${xAt(current)} ${y} L${xAt(next)} ${y}`;
+          current = next;
+        }
+      });
+      d += ` L${xAt(current)} ${bottomY}`;
+      return { d, destination: current };
+    }
+
+    function play() {
+      const rawName = input.value;
+      const name = normalizeName(rawName);
+      const info = assignments[name];
+
+      result.classList.remove("show");
+      error.classList.remove("show");
+      path.classList.remove("run");
+      path.setAttribute("d", "");
+      clearHighlights();
+
+      if (!name) {
+        error.textContent = "이름을 입력해주세요.";
+        error.classList.add("show");
+        return;
+      }
+      if (!info) {
+        error.textContent = `${rawName} 님은 등록된 참가자 명단에 없습니다.`;
+        error.classList.add("show");
+        return;
+      }
+
+      const route = buildPath(info.index);
+      path.setAttribute("d", route.d);
+      document.getElementById(`top-${name}`).classList.add("selectedTop");
+      document.getElementById(`bottom-${route.destination}`).classList.add("selectedBottom");
+      void path.getBoundingClientRect();
+      path.classList.add("run");
+
+      setTimeout(() => {
+        resultName.textContent = `${name} 님의 결과`;
+        resultTeam.textContent = bottomTeams[route.destination];
+        result.classList.add("show");
+      }, 1400);
+    }
+
+    drawLadder();
+    btn.addEventListener("click", play);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") play();
+    });
+  </script>
+</body>
+</html>
